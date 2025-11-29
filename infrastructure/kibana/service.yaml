@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  namespace: infrastructure
+  labels:
+    app: kibana
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5601
+    targetPort: 5601
+    protocol: TCP
+    name: http
+  selector:
+    app: kibana
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana-external
+  namespace: infrastructure
+  labels:
+    app: kibana
+spec:
+  type: NodePort
+  ports:
+  - port: 5601
+    targetPort: 5601
+    nodePort: 30561
+    protocol: TCP
+    name: http
+  selector:
+    app: kibana

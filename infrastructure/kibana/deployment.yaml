@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  namespace: infrastructure
+  labels:
+    app: kibana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kibana
+  template:
+    metadata:
+      labels:
+        app: kibana
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: pigpen
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+      - name: fix-permissions
+        image: busybox:1.37.0
+        command: ['sh', '-c', 'chown -R 1000:1000 /usr/share/kibana/data']
+        volumeMounts:
+        - name: kibana-storage
+          mountPath: /usr/share/kibana/data
+        securityContext:
+          runAsUser: 0
+      containers:
+      - name: kibana
+        image: docker.elastic.co/kibana/kibana:8.17.0
+        securityContext:
+          runAsUser: 1000
+        ports:
+        - containerPort: 5601
+          name: http
+          protocol: TCP
+        env:
+        - name: ELASTICSEARCH_HOSTS
+          value: "http://elasticsearch:9200"
+        volumeMounts:
+        - name: kibana-storage
+          mountPath: /usr/share/kibana/data
+        - name: kibana-config
+          mountPath: /usr/share/kibana/config/kibana.yml
+          subPath: kibana.yml
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /api/status
+            port: 5601
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 5
+        livenessProbe:
+          httpGet:
+            path: /api/status
+            port: 5601
+          initialDelaySeconds: 90
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+      volumes:
+      - name: kibana-storage
+        persistentVolumeClaim:
+          claimName: kibana-pvc
+      - name: kibana-config
+        configMap:
+          name: kibana-config
